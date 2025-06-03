@@ -16,41 +16,49 @@
   <div id="status">Not connected</div>
 
   <script>
-    const serviceUUID = BluetoothUUID.getService(0x180F); // ✅ Corrected
-    const characteristicUUID = '2a19';
+    const serviceUUID = BluetoothUUID.getService(0x180F); // ✅ Standard BLE Battery Service
+    const characteristicUUID = '2a19'; // ✅ Your characteristic
 
     async function connectToModule() {
       try {
-        console.log("🔍 Requesting BLE device...");
+        console.log("🔍 Step 1: Requesting BLE device...");
         const device = await navigator.bluetooth.requestDevice({
           acceptAllDevices: true,
           optionalServices: [serviceUUID]
         });
 
-        console.log("🔗 Connecting to GATT server...");
-        const server = await device.gatt.connect();
+        console.log("🔄 Step 2: Checking GATT connection...");
+        let server;
+        if (!device.gatt.connected) {
+          server = await device.gatt.connect();
+          console.log("✅ Connected to GATT server.");
+        } else {
+          server = device.gatt;
+          console.log("🔁 Already connected to GATT.");
+        }
 
-        console.log("📡 Getting service:", serviceUUID);
+        console.log("🔧 Step 3: Getting primary service...");
         const service = await server.getPrimaryService(serviceUUID);
 
-        console.log("📦 Getting characteristic:", characteristicUUID);
+        console.log("📦 Step 4: Getting characteristic...");
         const characteristic = await service.getCharacteristic(characteristicUUID);
 
-        document.getElementById('status').innerText = 'Connected – Reading...';
+        console.log("📶 Step 5: Starting notifications...");
+        await characteristic.startNotifications();
 
+        console.log("🎯 Notifications started. Waiting for values...");
         const decoder = new TextDecoder();
 
         characteristic.addEventListener('characteristicvaluechanged', event => {
           const value = decoder.decode(event.target.value);
-          console.log("✅ Received value:", value);
+          console.log("📡 Received value:", value);
           document.getElementById('status').innerText = `Status: ${value}`;
         });
 
-        await characteristic.startNotifications();
-        console.log("📶 Notifications started!");
+        document.getElementById('status').innerText = 'Connected – Reading...';
 
       } catch (error) {
-        console.error("❌ Error:", error);
+        console.error("❌ Error during connection process:", error);
         document.getElementById('status').innerText = 'Error connecting.';
       }
     }
