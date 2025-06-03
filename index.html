@@ -16,18 +16,24 @@
   <div id="status">Not connected</div>
 
   <script>
-    const serviceUUID = '180f';  // Matches Arduino BLE service
-    const characteristicUUID = '2a19';  // Matches Arduino BLE characteristic
+    const serviceUUID = BluetoothUUID.getService(0x180F);  // ✅ Corrected UUID usage
+    const characteristicUUID = '2a19';  // This one is fine as a string
 
     async function connectToModule() {
       try {
+        console.log("Requesting BLE device...");
         const device = await navigator.bluetooth.requestDevice({
-          acceptAllDevices: true, // Use this to debug; you can switch back to namePrefix later
+          acceptAllDevices: true,
           optionalServices: [serviceUUID]
         });
 
+        console.log("Connecting to GATT server...");
         const server = await device.gatt.connect();
+
+        console.log("Getting primary service:", serviceUUID);
         const service = await server.getPrimaryService(serviceUUID);
+
+        console.log("Getting characteristic:", characteristicUUID);
         const characteristic = await service.getCharacteristic(characteristicUUID);
 
         document.getElementById('status').innerText = 'Connected – Reading...';
@@ -36,14 +42,15 @@
 
         characteristic.addEventListener('characteristicvaluechanged', event => {
           const value = decoder.decode(event.target.value);
+          console.log("Received:", value);
           document.getElementById('status').innerText = `Status: ${value}`;
         });
 
         await characteristic.startNotifications();
-        console.log("Notifications started for characteristic:", characteristicUUID);
+        console.log("Notifications started!");
 
       } catch (error) {
-        console.error("Connection failed:", error);
+        console.error("Error:", error);
         document.getElementById('status').innerText = 'Error connecting.';
       }
     }
