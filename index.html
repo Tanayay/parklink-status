@@ -6,12 +6,14 @@
   <style>
     body { font-family: Arial, sans-serif; text-align: center; margin-top: 100px; }
     #status { font-size: 32px; margin-top: 30px; color: orange; }
+    #connectBtn { padding: 15px 25px; font-size: 18px; margin-top: 20px; }
   </style>
 </head>
 <body>
 
   <h1>ParkLink Spot Status</h1>
-  <div id="status">Connecting to spot...</div>
+  <button id="connectBtn" onclick="connectAutomatically()">Connect</button>
+  <div id="status">Not connected</div>
 
   <script>
     const serviceUUID = BluetoothUUID.getService(0x180F);
@@ -32,12 +34,12 @@
           reconnect();
         });
 
+        document.getElementById("connectBtn").style.display = "none"; // Hide after connect click
         await connectToDevice(device);
 
       } catch (error) {
-        console.error("❌ Error during initial connection:", error);
+        console.error("❌ Error during connection:", error);
         updateStatus("Parking spot unavailable", "red");
-        reconnect();
       }
     }
 
@@ -49,17 +51,17 @@
           server = await device.gatt.connect();
           console.log("✅ GATT connected.");
         } else {
-          console.log("🔁 Step 2: Reusing existing GATT connection.");
+          console.log("🔁 Reusing GATT connection.");
           server = device.gatt;
         }
 
         let service;
         try {
-          console.log("🛠 Step 3: Getting primary service...");
+          console.log("🛠 Step 3: Getting service...");
           service = await server.getPrimaryService(serviceUUID);
         } catch (innerError) {
-          console.warn("⚠️ GATT said connected, but service fetch failed. Reconnecting...");
-          server = await device.gatt.connect(); // Force reconnect
+          console.warn("⚠️ Retrying after false GATT connection...");
+          server = await device.gatt.connect();
           service = await server.getPrimaryService(serviceUUID);
         }
 
@@ -70,7 +72,7 @@
         const decoder = new TextDecoder();
         characteristic.addEventListener('characteristicvaluechanged', event => {
           const value = decoder.decode(event.target.value);
-          console.log("📡 Value received:", value);
+          console.log("📡 Received:", value);
           updateStatus("Parking spot available", "green");
         });
 
@@ -93,12 +95,9 @@
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       reconnectTimeout = setTimeout(() => {
         updateStatus("Reconnecting...", "orange");
-        connectAutomatically();
+        document.getElementById("connectBtn").style.display = "inline-block"; // Re-show button
       }, 3000);
     }
-
-    // Auto-start on page load
-    connectAutomatically();
   </script>
 
 </body>
