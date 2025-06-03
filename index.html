@@ -1,72 +1,61 @@
-#include <ArduinoBLE.h>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ParkLink Spot Status</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; margin-top: 100px; }
+    #status { font-size: 36px; margin-top: 30px; color: gray; }
+    button { padding: 15px 25px; font-size: 18px; }
+  </style>
+</head>
+<body>
 
-#define LIDAR_RX_PIN 10
-#define LIDAR_TX_PIN 11
+  <h1>ParkLink Spot Status</h1>
+  <button onclick="connectToModule()">Connect</button>
+  <div id="status">Not connected</div>
 
-const int distanceThreshold = 30;
-const unsigned long reportInterval = 100;
-unsigned long previousMillis = 0;
+  <script>
+    const serviceUUID = BluetoothUUID.getService(0x180F);
+    const characteristicUUID = '2a19';
 
-BLEService relayService("180F");
-BLECharacteristic relayCharacteristic("2A19", BLERead | BLEWrite, 32);
+    async function connectToModule() {
+      try {
+        const device = await navigator.bluetooth.requestDevice({
+          filters: [{ namePrefix: 'ParkLink' }],
+          optionalServices: [serviceUUID]
+        });
 
-void setup() {
-  Serial.begin(115200);
-  Serial1.begin(115200);
+        let server = device.gatt;
+        if (!server.connected) {
+          console.warn("GATT not connected — reconnecting...");
+          server = await device.gatt.connect();
+        }
 
-  if (!BLE.begin()) {
-    Serial.println("BLE failed to start!");
-    while (1);
-  }
+        const service = await server.getPrimaryService(serviceUUID);
+        const characteristic = await service.getCharacteristic(characteristicUUID);
 
-  relayService.addCharacteristic(relayCharacteristic);
-  BLE.addService(relayService);
+        const decoder = new TextDecoder();
 
-  BLE.setLocalName("ParkLink Node B");
-  BLE.advertise();  // Continuous advertising
+        characteristic.addEventListener('characteristicvaluechanged', event => {
+          const value = decoder.decode(event.target.value).trim();
+          document.getElementById('status').innerText = value;
+          document.getElementById('status').style.color =
+            value.includes("Available") ? "green" : "red";
+        });
 
-  Serial.println("BLE advertising started.");
-}
+        await characteristic.startNotifications();
 
-void loop() {
-  unsigned long currentMillis = millis();
+        document.getElementById('status').innerText = 'Connected – Waiting for updates...';
+        document.getElementById('status').style.color = 'orange';
 
-  if (currentMillis - previousMillis >= reportInterval) {
-    previousMillis = currentMillis;
-
-    int distance = readLidarDistance();
-    Serial.print("Distance: ");
-    Serial.println(distance);
-
-    const char* message = (distance > 0 && distance < distanceThreshold)
-                          ? "Parking Spot Unavailable"
-                          : "Parking Spot Available";
-
-    relayCharacteristic.setValue(message);
-    relayCharacteristic.writeValue(message);
-
-    Serial.println("Status sent: " + String(message));
-  }
-
-  delay(10);
-}
-
-int readLidarDistance() {
-  if (Serial1.available() >= 9) {
-    byte header1 = Serial1.read();
-    byte header2 = Serial1.read();
-
-    if (header1 == 0x59 && header2 == 0x59) {
-      byte dist_L = Serial1.read();
-      byte dist_H = Serial1.read();
-      int dist = (dist_H << 8) + dist_L;
-
-      for (int i = 0; i < 5; i++) if (Serial1.available()) Serial1.read();
-      return dist;
-    } else {
-      while (Serial1.available()) Serial1.read();
-      return -1;
+      } catch (error) {
+        console.error("Connection error:", error);
+        document.getElementById('status').innerText = 'Error connecting';
+        document.getElementById('status').style.color = 'gray';
+      }
     }
-  }
-  return -1;
-}
+  </script>
+
+</body>
+</html>
