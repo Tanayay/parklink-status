@@ -5,63 +5,92 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body { font-family: Arial, sans-serif; text-align: center; margin-top: 100px; }
-    button { padding: 15px 25px; font-size: 18px; }
-    #status { font-size: 32px; margin-top: 30px; }
+    #status { font-size: 32px; margin-top: 30px; color: green; }
   </style>
 </head>
 <body>
 
   <h1>ParkLink Spot Status</h1>
-  <button onclick="connectToModule()">Connect</button>
-  <div id="status">Not connected</div>
+  <div id="status">Connecting to spot...</div>
 
   <script>
     const serviceUUID = BluetoothUUID.getService(0x180F);
     const characteristicUUID = '2a19';
+    let reconnectTimeout;
 
-    async function connectToModule() {
+    async function connectAutomatically() {
       try {
-        console.log("🔍 Step 1: Requesting BLE device...");
+        console.log("🔍 Scanning for ParkLink BLE device...");
         const device = await navigator.bluetooth.requestDevice({
-          acceptAllDevices: true,
+          filters: [{ namePrefix: 'ParkLink' }],
           optionalServices: [serviceUUID]
         });
 
-        console.log("🔄 Step 2: Checking GATT connection...");
-        let server;
-        if (!device.gatt.connected) {
-          server = await device.gatt.connect();
-          console.log("✅ Connected to GATT server.");
-        } else {
-          server = device.gatt;
-          console.log("🔁 Already connected to GATT.");
-        }
-
-        console.log("🔧 Step 3: Getting primary service...");
-        const service = await server.getPrimaryService(serviceUUID);
-
-        console.log("📦 Step 4: Getting characteristic...");
-        const characteristic = await service.getCharacteristic(characteristicUUID);
-
-        console.log("📶 Step 5: Starting notifications...");
-        await characteristic.startNotifications();
-
-        console.log("🎯 Notifications started. Waiting for values...");
-        const decoder = new TextDecoder();
-
-        characteristic.addEventListener('characteristicvaluechanged', event => {
-          const value = decoder.decode(event.target.value);
-          console.log("📡 Received value:", value);
-          document.getElementById('status').innerText = `Status: ${value}`;
+        device.addEventListener('gattserverdisconnected', () => {
+          console.warn("📴 BLE device disconnected.");
+          updateStatus("Parking spot unavailable", "red");
+          reconnect();
         });
 
-        document.getElementById('status').innerText = 'Connected – Reading...';
+        await connectToDevice(device);
 
       } catch (error) {
-        console.error("❌ Error during connection process:", error);
-        document.getElementById('status').innerText = 'Error connecting.';
+        console.error("❌ Failed to connect:", error);
+        updateStatus("Parking spot unavailable", "red");
+        reconnect();
       }
     }
+
+    async function connectToDevice(device) {
+      try {
+        let server;
+        if (!device.gatt.connected) {
+          console.log("🔗 Connecting to GATT...");
+          server = await device.gatt.connect();
+          console.log("✅ GATT connected.");
+        } else {
+          server = device.gatt;
+          console.log("🔁 Reusing existing GATT connection.");
+        }
+
+        const service = await server.getPrimaryService(serviceUUID);
+        const characteristic = await service.getCharacteristic(characteristicUUID);
+
+        console.log("📡 Subscribing to characteristic...");
+        await characteristic.startNotifications();
+
+        const decoder = new TextDecoder();
+        characteristic.addEventListener('characteristicvaluechanged', event => {
+          const value = decoder.decode(event.target.value);
+          console.log("📶 Received:", value);
+          updateStatus("Parking spot available", "green");
+        });
+
+        updateStatus("Parking spot available", "green");
+
+      } catch (error) {
+        console.error("⚠️ Error during connection flow:", error);
+        updateStatus("Parking spot unavailable", "red");
+        reconnect();
+      }
+    }
+
+    function updateStatus(text, color) {
+      const statusDiv = document.getElementById('status');
+      statusDiv.textContent = text;
+      statusDiv.style.color = color;
+    }
+
+    function reconnect() {
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      reconnectTimeout = setTimeout(() => {
+        updateStatus("Reconnecting...", "orange");
+        connectAutomatically();
+      }, 3000);
+    }
+
+    // 🔄 Auto-start
+    connectAutomatically();
   </script>
 
 </body>
