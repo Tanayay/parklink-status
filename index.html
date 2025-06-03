@@ -16,13 +16,13 @@
   <div id="status">Not connected</div>
 
   <script>
-    const serviceUUID = '180a'; // same as Arduino
-    const characteristicUUID = '2a57'; // same as Arduino
+    const serviceUUID = '180f';  // Matches Arduino BLE service
+    const characteristicUUID = '2a19';  // Matches Arduino BLE characteristic
 
     async function connectToModule() {
       try {
         const device = await navigator.bluetooth.requestDevice({
-          filters: [{ namePrefix: 'ParkLink' }],
+          acceptAllDevices: true, // Use this to debug; you can switch back to namePrefix later
           optionalServices: [serviceUUID]
         });
 
@@ -34,16 +34,16 @@
 
         const decoder = new TextDecoder();
 
-        // Read and subscribe to notifications
         characteristic.addEventListener('characteristicvaluechanged', event => {
           const value = decoder.decode(event.target.value);
           document.getElementById('status').innerText = `Status: ${value}`;
         });
 
         await characteristic.startNotifications();
+        console.log("Notifications started for characteristic:", characteristicUUID);
 
       } catch (error) {
-        console.error(error);
+        console.error("Connection failed:", error);
         document.getElementById('status').innerText = 'Error connecting.';
       }
     }
