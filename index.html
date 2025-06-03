@@ -34,7 +34,7 @@
           reconnect();
         });
 
-        document.getElementById("connectBtn").style.display = "none"; // Hide after connect click
+        document.getElementById("connectBtn").style.display = "none";
         await connectToDevice(device);
 
       } catch (error) {
@@ -55,13 +55,16 @@
           server = device.gatt;
         }
 
+        await new Promise(r => setTimeout(r, 300)); // Short delay for stability
+
         let service;
         try {
-          console.log("🛠 Step 3: Getting service...");
+          console.log("🛠 Step 3: Getting primary service...");
           service = await server.getPrimaryService(serviceUUID);
         } catch (innerError) {
-          console.warn("⚠️ Retrying after false GATT connection...");
+          console.warn("⚠️ Reconnecting after failed service fetch...");
           server = await device.gatt.connect();
+          await new Promise(r => setTimeout(r, 300));
           service = await server.getPrimaryService(serviceUUID);
         }
 
@@ -72,7 +75,7 @@
         const decoder = new TextDecoder();
         characteristic.addEventListener('characteristicvaluechanged', event => {
           const value = decoder.decode(event.target.value);
-          console.log("📡 Received:", value);
+          console.log("📡 Value received:", value);
           updateStatus("Parking spot available", "green");
         });
 
@@ -95,7 +98,7 @@
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       reconnectTimeout = setTimeout(() => {
         updateStatus("Reconnecting...", "orange");
-        document.getElementById("connectBtn").style.display = "inline-block"; // Re-show button
+        document.getElementById("connectBtn").style.display = "inline-block";
       }, 3000);
     }
   </script>
