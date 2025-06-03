@@ -16,24 +16,24 @@
   <div id="status">Not connected</div>
 
   <script>
-    const serviceUUID = BluetoothUUID.getService(0x180F);  // ✅ Corrected UUID usage
-    const characteristicUUID = '2a19';  // This one is fine as a string
+    const serviceUUID = BluetoothUUID.getService(0x180F); // ✅ Corrected
+    const characteristicUUID = '2a19';
 
     async function connectToModule() {
       try {
-        console.log("Requesting BLE device...");
+        console.log("🔍 Requesting BLE device...");
         const device = await navigator.bluetooth.requestDevice({
           acceptAllDevices: true,
           optionalServices: [serviceUUID]
         });
 
-        console.log("Connecting to GATT server...");
+        console.log("🔗 Connecting to GATT server...");
         const server = await device.gatt.connect();
 
-        console.log("Getting primary service:", serviceUUID);
+        console.log("📡 Getting service:", serviceUUID);
         const service = await server.getPrimaryService(serviceUUID);
 
-        console.log("Getting characteristic:", characteristicUUID);
+        console.log("📦 Getting characteristic:", characteristicUUID);
         const characteristic = await service.getCharacteristic(characteristicUUID);
 
         document.getElementById('status').innerText = 'Connected – Reading...';
@@ -42,15 +42,15 @@
 
         characteristic.addEventListener('characteristicvaluechanged', event => {
           const value = decoder.decode(event.target.value);
-          console.log("Received:", value);
+          console.log("✅ Received value:", value);
           document.getElementById('status').innerText = `Status: ${value}`;
         });
 
         await characteristic.startNotifications();
-        console.log("Notifications started!");
+        console.log("📶 Notifications started!");
 
       } catch (error) {
-        console.error("Error:", error);
+        console.error("❌ Error:", error);
         document.getElementById('status').innerText = 'Error connecting.';
       }
     }
