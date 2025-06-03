@@ -1,105 +1,53 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ParkLink Status</title>
+  <title>ParkLink Live Status</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body { font-family: Arial, sans-serif; text-align: center; margin-top: 100px; }
-    #status { font-size: 32px; margin-top: 30px; color: orange; }
-    #connectBtn { padding: 15px 25px; font-size: 18px; margin-top: 20px; }
+    #status { font-size: 40px; margin-top: 30px; color: orange; }
+    button { padding: 15px 25px; font-size: 18px; }
   </style>
 </head>
 <body>
 
   <h1>ParkLink Spot Status</h1>
-  <button id="connectBtn" onclick="connectAutomatically()">Connect</button>
+  <button onclick="connectToModule()">Connect</button>
   <div id="status">Not connected</div>
 
   <script>
     const serviceUUID = BluetoothUUID.getService(0x180F);
     const characteristicUUID = '2a19';
-    let reconnectTimeout;
 
-    async function connectAutomatically() {
+    async function connectToModule() {
       try {
-        console.log("🔍 Step 1: Requesting BLE device...");
         const device = await navigator.bluetooth.requestDevice({
           filters: [{ namePrefix: 'ParkLink' }],
           optionalServices: [serviceUUID]
         });
 
-        device.addEventListener('gattserverdisconnected', () => {
-          console.warn("📴 BLE device disconnected.");
-          updateStatus("Parking spot unavailable", "red");
-          reconnect();
-        });
-
-        document.getElementById("connectBtn").style.display = "none";
-        await connectToDevice(device);
-
-      } catch (error) {
-        console.error("❌ Error during connection:", error);
-        updateStatus("Parking spot unavailable", "red");
-      }
-    }
-
-    async function connectToDevice(device) {
-      try {
-        let server;
-        if (!device.gatt.connected) {
-          console.log("🔗 Step 2: Connecting to GATT server...");
-          server = await device.gatt.connect();
-          console.log("✅ GATT connected.");
-        } else {
-          console.log("🔁 Reusing GATT connection.");
-          server = device.gatt;
-        }
-
-        await new Promise(r => setTimeout(r, 300)); // Short buffer delay
-
-        let service;
-        try {
-          console.log("🛠 Step 3: Getting primary service...");
-          service = await server.getPrimaryService(serviceUUID);
-        } catch (innerError) {
-          console.warn("⚠️ Reconnecting after failed service fetch...");
-          server = await device.gatt.connect();
-          await new Promise(r => setTimeout(r, 300));
-          service = await server.getPrimaryService(serviceUUID);
-        }
-
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService(serviceUUID);
         const characteristic = await service.getCharacteristic(characteristicUUID);
-        await characteristic.startNotifications();
-        console.log("📶 Notifications started.");
 
         const decoder = new TextDecoder();
+
         characteristic.addEventListener('characteristicvaluechanged', event => {
           const value = decoder.decode(event.target.value);
-          console.log("📡 Value received:", value);
-          updateStatus("Parking spot available", "green");
+          document.getElementById('status').innerText = value;
+          document.getElementById('status').style.color = value === 'Enabled' ? 'green' : 'red';
         });
 
-        updateStatus("Parking spot available", "green");
+        await characteristic.startNotifications();
+
+        document.getElementById('status').innerText = 'Connected – Waiting for updates...';
+        document.getElementById('status').style.color = 'orange';
 
       } catch (error) {
-        console.error("❌ Error during device setup:", error);
-        updateStatus("Parking spot unavailable", "red");
-        reconnect();
+        console.error("Error:", error);
+        document.getElementById('status').innerText = 'Error connecting';
+        document.getElementById('status').style.color = 'gray';
       }
-    }
-
-    function updateStatus(text, color) {
-      const status = document.getElementById("status");
-      status.textContent = text;
-      status.style.color = color;
-    }
-
-    function reconnect() {
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
-      reconnectTimeout = setTimeout(() => {
-        updateStatus("Reconnecting...", "orange");
-        document.getElementById("connectBtn").style.display = "inline-block";
-      }, 3000);
     }
   </script>
 
