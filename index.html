@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ParkLink Live Status</title>
+  <title>ParkLink Status</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body { font-family: Arial, sans-serif; text-align: center; margin-top: 100px; }
-    #status { font-size: 40px; margin-top: 30px; color: orange; }
+    #status { font-size: 36px; margin-top: 30px; color: gray; }
     button { padding: 15px 25px; font-size: 18px; }
   </style>
 </head>
@@ -33,9 +33,17 @@
         const decoder = new TextDecoder();
 
         characteristic.addEventListener('characteristicvaluechanged', event => {
-          const value = decoder.decode(event.target.value);
-          document.getElementById('status').innerText = value;
-          document.getElementById('status').style.color = value === 'Enabled' ? 'green' : 'red';
+          const value = decoder.decode(event.target.value).trim();
+          if (value === "Enabled") {
+            document.getElementById('status').innerText = "Parking Spot Available";
+            document.getElementById('status').style.color = "green";
+          } else if (value === "Disabled") {
+            document.getElementById('status').innerText = "Parking Spot Unavailable";
+            document.getElementById('status').style.color = "red";
+          } else {
+            document.getElementById('status').innerText = "Unknown status";
+            document.getElementById('status').style.color = "orange";
+          }
         });
 
         await characteristic.startNotifications();
