@@ -16,8 +16,8 @@
   <div id="status">Not connected</div>
 
   <script>
-    const serviceUUID = BluetoothUUID.getService(0x180F); // ✅ Standard BLE Battery Service
-    const characteristicUUID = '2a19'; // ✅ Your characteristic
+    const serviceUUID = BluetoothUUID.getService(0x180F);
+    const characteristicUUID = '2a19';
 
     async function connectToModule() {
       try {
