@@ -27,7 +27,7 @@
         });
 
         device.addEventListener('gattserverdisconnected', () => {
-          console.warn("📴 BLE disconnected.");
+          console.warn("📴 BLE device disconnected.");
           updateStatus("Parking spot unavailable", "red");
           reconnect();
         });
@@ -35,37 +35,52 @@
         await connectToDevice(device);
 
       } catch (error) {
-        console.error("❌ Error during connection process:", error);
+        console.error("❌ Error during initial connection:", error);
         updateStatus("Parking spot unavailable", "red");
         reconnect();
       }
     }
 
     async function connectToDevice(device) {
-      let server;
-      if (!device.gatt.connected) {
-        console.log("🔗 Connecting to GATT...");
-        server = await device.gatt.connect();
-        console.log("✅ GATT connected.");
-      } else {
-        console.log("🔁 Already connected to GATT.");
-        server = device.gatt;
-      }
+      try {
+        let server;
+        if (!device.gatt.connected) {
+          console.log("🔗 Step 2: Connecting to GATT server...");
+          server = await device.gatt.connect();
+          console.log("✅ GATT connected.");
+        } else {
+          console.log("🔁 Step 2: Reusing existing GATT connection.");
+          server = device.gatt;
+        }
 
-      const service = await server.getPrimaryService(serviceUUID);
-      const characteristic = await service.getCharacteristic(characteristicUUID);
+        let service;
+        try {
+          console.log("🛠 Step 3: Getting primary service...");
+          service = await server.getPrimaryService(serviceUUID);
+        } catch (innerError) {
+          console.warn("⚠️ GATT said connected, but service fetch failed. Reconnecting...");
+          server = await device.gatt.connect(); // Force reconnect
+          service = await server.getPrimaryService(serviceUUID);
+        }
 
-      await characteristic.startNotifications();
-      console.log("📶 Notifications started.");
+        const characteristic = await service.getCharacteristic(characteristicUUID);
+        await characteristic.startNotifications();
+        console.log("📶 Notifications started.");
 
-      const decoder = new TextDecoder();
-      characteristic.addEventListener('characteristicvaluechanged', event => {
-        const value = decoder.decode(event.target.value);
-        console.log("📡 Value received:", value);
+        const decoder = new TextDecoder();
+        characteristic.addEventListener('characteristicvaluechanged', event => {
+          const value = decoder.decode(event.target.value);
+          console.log("📡 Value received:", value);
+          updateStatus("Parking spot available", "green");
+        });
+
         updateStatus("Parking spot available", "green");
-      });
 
-      updateStatus("Parking spot available", "green");
+      } catch (error) {
+        console.error("❌ Error during device setup:", error);
+        updateStatus("Parking spot unavailable", "red");
+        reconnect();
+      }
     }
 
     function updateStatus(text, color) {
@@ -82,7 +97,7 @@
       }, 3000);
     }
 
-    // Auto-connect on load
+    // Auto-start on page load
     connectAutomatically();
   </script>
 
