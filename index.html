@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body { font-family: Arial, sans-serif; text-align: center; margin-top: 100px; }
-    #status { font-size: 32px; margin-top: 30px; color: green; }
+    #status { font-size: 32px; margin-top: 30px; color: orange; }
   </style>
 </head>
 <body>
@@ -20,14 +20,14 @@
 
     async function connectAutomatically() {
       try {
-        console.log("🔍 Scanning for ParkLink BLE device...");
+        console.log("🔍 Step 1: Requesting BLE device...");
         const device = await navigator.bluetooth.requestDevice({
           filters: [{ namePrefix: 'ParkLink' }],
           optionalServices: [serviceUUID]
         });
 
         device.addEventListener('gattserverdisconnected', () => {
-          console.warn("📴 BLE device disconnected.");
+          console.warn("📴 BLE disconnected.");
           updateStatus("Parking spot unavailable", "red");
           reconnect();
         });
@@ -35,50 +35,43 @@
         await connectToDevice(device);
 
       } catch (error) {
-        console.error("❌ Failed to connect:", error);
+        console.error("❌ Error during connection process:", error);
         updateStatus("Parking spot unavailable", "red");
         reconnect();
       }
     }
 
     async function connectToDevice(device) {
-      try {
-        let server;
-        if (!device.gatt.connected) {
-          console.log("🔗 Connecting to GATT...");
-          server = await device.gatt.connect();
-          console.log("✅ GATT connected.");
-        } else {
-          server = device.gatt;
-          console.log("🔁 Reusing existing GATT connection.");
-        }
-
-        const service = await server.getPrimaryService(serviceUUID);
-        const characteristic = await service.getCharacteristic(characteristicUUID);
-
-        console.log("📡 Subscribing to characteristic...");
-        await characteristic.startNotifications();
-
-        const decoder = new TextDecoder();
-        characteristic.addEventListener('characteristicvaluechanged', event => {
-          const value = decoder.decode(event.target.value);
-          console.log("📶 Received:", value);
-          updateStatus("Parking spot available", "green");
-        });
-
-        updateStatus("Parking spot available", "green");
-
-      } catch (error) {
-        console.error("⚠️ Error during connection flow:", error);
-        updateStatus("Parking spot unavailable", "red");
-        reconnect();
+      let server;
+      if (!device.gatt.connected) {
+        console.log("🔗 Connecting to GATT...");
+        server = await device.gatt.connect();
+        console.log("✅ GATT connected.");
+      } else {
+        console.log("🔁 Already connected to GATT.");
+        server = device.gatt;
       }
+
+      const service = await server.getPrimaryService(serviceUUID);
+      const characteristic = await service.getCharacteristic(characteristicUUID);
+
+      await characteristic.startNotifications();
+      console.log("📶 Notifications started.");
+
+      const decoder = new TextDecoder();
+      characteristic.addEventListener('characteristicvaluechanged', event => {
+        const value = decoder.decode(event.target.value);
+        console.log("📡 Value received:", value);
+        updateStatus("Parking spot available", "green");
+      });
+
+      updateStatus("Parking spot available", "green");
     }
 
     function updateStatus(text, color) {
-      const statusDiv = document.getElementById('status');
-      statusDiv.textContent = text;
-      statusDiv.style.color = color;
+      const status = document.getElementById("status");
+      status.textContent = text;
+      status.style.color = color;
     }
 
     function reconnect() {
@@ -89,7 +82,7 @@
       }, 3000);
     }
 
-    // 🔄 Auto-start
+    // Auto-connect on load
     connectAutomatically();
   </script>
 
